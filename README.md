@@ -46,7 +46,7 @@ The project includes a 'run-local.sh' script to automate the environment bootstr
 ---
 
 ## How to run
-1. Ensure **Docker Desktop and **kind** are installed and running on WSL 2.
+1. Ensure **Docker Desktop** and **kind** are installed and running on WSL 2.
 2. Execute the boostrap script:
     ```bash
     ./run-local.sh
