@@ -1,52 +1,63 @@
-# Local Kubernetes Development Environment
-A technical project documenting containerization of a Python application within a local Kubernetes cluster.
+# Local Kubernetes Lab
 
----
+A Flask app running on a local Kubernetes cluster, built to learn how the pieces
+actually behave rather than to ship anything. One script brings the whole
+environment up from nothing.
 
-## Overview
-This project demonstrates the workflow needed to move a local Python application into a managed, distributed environment. It focuses on the practical application of immutability.
+## Stack
 
----
+- Python 3.11 / Flask
+- Docker Desktop
+- Kubernetes v1.30
+- kind (Kubernetes in Docker), running on WSL 2
 
-## Tech Stack
-- **Language:** Python 3.11 / Flask
-- **Containerization:** Docker Desktop
-- **Orchestration:** Kubernetes (v1.30)
-- **Local Cluster:** 'kind' (Kubernetes thru Docker)
+## What's in here
 
----
+Three manifests in `k8s/`:
 
-## System Components
-The infrastructure is defined by three primary Kubernetes manfifests located inside of the '/k8s' directory:
+| File | What it does |
+|---|---|
+| `deployment.yaml` | Holds 3 replicas and manages the pod lifecycle |
+| `service.yaml` | ClusterIP — stable internal address, round-robins across healthy pods |
+| `configmap.yaml` | Externalizes the greeting string so it changes without a rebuild |
 
-1. **Deployment:** Configured to maintain a desired state of **3 replicas** It manages the lifecyle of the application pods.
-2. **Service (ClusterIP):** Acts as a stable internal entry point. It performs round-robin load balancing across all healthy pods.
-3. **ConfigMap:** Externalizes application configuration (the greeting), allowing for runtime updates without code changes.
+The app (`app/main.py`) returns its own hostname on `/`, which is how you see the
+Service load-balancing across pods, and answers `/health` for the readiness check.
 
----
+## Running it
 
-## Automation Workflow
-The project includes a 'run-local.sh' script to automate the environment bootstrap and ensure reprioducibility:
+Docker Desktop and kind need to be installed and running under WSL 2.
 
-1. **Cleanup:** Deletes existing clusters to ensure a deterministic environment.
-2. **Build:** Compiles the docker image into the local Dockerfile
-3. **Sideloader:** Pushes the lcoal image directly into the 'kind' nodes to bypass external registry requirements.
-4. **Synchronization:** Uses 'kubectl wait' to ensure all pods have passed health check before proceeding
-5. **Networking:** Establishes a 'port-forward' bridge from the host machine to the internal service.
+```bash
+./run-local.sh
+```
 
----
+Then hit `http://localhost:8080` a few times — the hostname in the response
+changes as the Service distributes requests.
 
+`run-local.sh` does five things, in order:
 
-## Technical Observations
-- **Immutability:** Verified the running pods are static artifacts. Code updates require a full rebuild a rolling deployment to take effect. 
-- **Self-Healing:** Observed the Kubernetes Control Plane automatically detecting pod deletion and provisioning new instances to maintain the definwed 3-replica count.
-- **Service Discovery:** Confirmed that the service succesfully abstracts pod IP addresses, providing a single stable DNS/IP for the application.
-- **Troubleshooting:** Utilized 'kubectl logs' to identify and resolve runtime errors in Python code.
+1. **Cleanup** — deletes any existing cluster, so every run starts from the same state
+2. **Build** — builds the image from `app/Dockerfile`
+3. **Sideload** — loads the image straight into the kind nodes, skipping a registry
+4. **Wait** — `kubectl wait` blocks until pods pass their health check
+5. **Forward** — opens a `port-forward` from the host to the Service
 
----
+Step 4 matters more than it looks. Without it the port-forward races the pods and
+fails intermittently, which is a confusing thing to debug the first time.
 
-## How to run
-1. Ensure **Docker Desktop** and **kind** are installed and running on WSL 2.
-2. Execute the boostrap script:
-    ```bash
-    ./run-local.sh
+## What I took away from it
+
+**Pods are immutable.** Editing the Python source changes nothing until you
+rebuild the image and roll the deployment. Obvious in hindsight; not obvious when
+you're wondering why your change didn't show up.
+
+**Self-healing is fast.** Delete a pod with `kubectl delete pod` and the control
+plane has a replacement running before you can check — the deployment holds at 3
+replicas regardless.
+
+**The Service is the stable thing, not the pods.** Pod IPs churn. The ClusterIP
+doesn't, which is the whole point of the abstraction.
+
+**`kubectl logs` is the first stop.** Every runtime error I hit in the Flask code
+surfaced there before anywhere else.
