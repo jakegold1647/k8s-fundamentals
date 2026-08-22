@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # 1. clean up the old clusters
 kind delete cluster --name learning
 
