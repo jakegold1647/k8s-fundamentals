@@ -32,18 +32,20 @@ Docker Desktop and kind need to be installed and running under WSL 2.
 ./run-local.sh
 ```
 
-Then hit `http://localhost:8080` a few times — the hostname in the response
+Then hit `http://localhost:8081` a few times — the hostname in the response
 changes as the Service distributes requests.
 
-`run-local.sh` does five things, in order:
+`run-local.sh` does seven things, in order:
 
 1. **Cleanup** — deletes any existing cluster, so every run starts from the same state
 2. **Build** — builds the image from `app/Dockerfile`
-3. **Sideload** — loads the image straight into the kind nodes, skipping a registry
-4. **Wait** — `kubectl wait` blocks until pods pass their health check
-5. **Forward** — opens a `port-forward` from the host to the Service
+3. **Create** — starts a fresh kind cluster named `learning`
+4. **Sideload** — loads the image straight into the kind nodes, skipping a registry
+5. **Deploy** — applies the ConfigMap, Deployment, and Service manifests
+6. **Wait** — `kubectl wait` blocks until pods pass their health check
+7. **Forward** — opens a `port-forward` from port 8081 on the host to the Service
 
-Step 4 matters more than it looks. Without it the port-forward races the pods and
+Step 6 matters more than it looks. Without it the port-forward races the pods and
 fails intermittently, which is a confusing thing to debug the first time.
 
 ## What I took away from it
